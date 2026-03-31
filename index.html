@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>華夏玻璃｜CEO 產銷儀表板</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f0f2f8;
+    --card: #ffffff;
+    --card2: #f5f7fc;
+    --border: #dde2ef;
+    --text: #1e2235;
+    --muted: #6b7280;
+    --red: #dc2626;
+    --red-bg: rgba(220,38,38,0.08);
+    --yellow: #b45309;
+    --yellow-bg: rgba(180,83,9,0.08);
+    --green: #16a34a;
+    --green-bg: rgba(22,163,74,0.08);
+    --blue: #2563eb;
+    --accent: #6366f1;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; min-height: 100vh; }
+
+  /* ── HEADER ── */
+  .header {
+    background: linear-gradient(135deg, #ffffff 0%, #eef0fb 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(99,102,241,0.07);
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .logo-circle {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #818cf8);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 18px; color: #fff; flex-shrink: 0;
+  }
+  .header h1 { font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: 1px; }
+  .header .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .header-right { text-align: right; }
+  .header-right .date { font-size: 13px; color: var(--muted); }
+  .header-right .report-tag {
+    display: inline-block; margin-top: 4px;
+    background: var(--accent); color: #fff;
+    font-size: 11px; padding: 2px 10px; border-radius: 20px; font-weight: 600;
+  }
+
+  /* ── TAB NAV ── */
+  .tab-nav {
+    background: var(--card);
+    border-bottom: 2px solid var(--border);
+    display: flex; gap: 0; padding: 0 32px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .tab-btn {
+    padding: 14px 24px; font-size: 14px; font-weight: 600;
+    cursor: pointer; border: none; background: none; color: var(--muted);
+    border-bottom: 3px solid transparent; transition: all 0.2s;
+  }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-btn:hover:not(.active) { color: var(--text); }
+
+  /* ── CONTENT ── */
+  .tab-content { display: none; padding: 28px 32px; }
+  .tab-content.active { display: block; }
+
+  /* ── KPI CARDS ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .kpi-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 20px;
+    position: relative; overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(99,102,241,0.15); }
+  .kpi-card.red { border-left: 4px solid var(--red); background: linear-gradient(135deg, var(--red-bg), var(--card)); }
+  .kpi-card.yellow { border-left: 4px solid var(--yellow); background: linear-gradient(135deg, var(--yellow-bg), var(--card)); }
+  .kpi-card.green { border-left: 4px solid var(--green); background: linear-gradient(135deg, var(--green-bg), var(--card)); }
+  .kpi-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; font-weight: 500; }
+  .kpi-value { font-size: 28px; font-weight: 800; line-height: 1; }
+  .kpi-card.red .kpi-value { color: var(--red); }
+  .kpi-card.yellow .kpi-value { color: var(--yellow); }
+  .kpi-card.green .kpi-value { color: var(--green); }
+  .kpi-baseline { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .kpi-delta {
+    display: inline-block; margin-top: 6px;
+    font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 20px;
+  }
+  .kpi-delta.neg { background: var(--red-bg); color: var(--red); }
+  .kpi-delta.pos { background: var(--green-bg); color: var(--green); }
+  .kpi-delta.warn { background: var(--yellow-bg); color: var(--yellow); }
+  .val-muted { color: #9ca3af; font-style: italic; }
+  .status-dot {
+    position: absolute; top: 14px; right: 14px;
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+  .status-dot.red { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .status-dot.yellow { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
+  .status-dot.green { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+  /* ── ALERT BOX ── */
+  .alert-box {
+    border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;
+    display: flex; align-items: flex-start; gap: 12px;
+    font-size: 13px; line-height: 1.6;
+  }
+  .alert-box.red { background: var(--red-bg); border: 1px solid rgba(220,38,38,0.25); color: #991b1b; }
+  .alert-box.yellow { background: var(--yellow-bg); border: 1px solid rgba(180,83,9,0.25); color: #78350f; }
+  .alert-box.green { background: var(--green-bg); border: 1px solid rgba(22,163,74,0.25); color: #14532d; }
+  .alert-icon { font-size: 18px; flex-shrink: 0; }
+
+  /* ── CHART SECTION ── */
+  .section-title {
+    font-size: 15px; font-weight: 700; color: var(--text);
+    margin-bottom: 16px; padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .charts-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+  .chart-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .chart-card h3 { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 16px; }
+  .chart-wrapper { position: relative; }
+
+  /* ── FURNACE TABLE ── */
+  .furnace-table { width: 100%; border-collapse: collapse; }
+  .furnace-table th {
+    background: var(--card2); color: var(--muted);
+    font-size: 12px; font-weight: 600; padding: 10px 14px;
+    text-align: left; border-bottom: 1px solid var(--border);
+  }
+  .furnace-table td {
+    padding: 10px 14px; font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .furnace-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 700;
+  }
+  .badge.red { background: var(--red-bg); color: var(--red); }
+  .badge.yellow { background: var(--yellow-bg); color: var(--yellow); }
+  .badge.green { background: var(--green-bg); color: var(--green); }
+
+  /* ── TOOLTIP / ANNOTATION ── */
+  .annotation {
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px;
+    font-size: 12px; color: var(--muted); margin-top: 10px;
+    line-height: 1.7;
+  }
+  .annotation span { color: var(--text); font-weight: 600; }
+
+  /* ── MONTH SELECTOR ── */
+  .month-selector { display: flex; gap: 8px; margin-bottom: 20px; }
+  .month-btn {
+    padding: 6px 18px; border-radius: 20px; border: 1px solid var(--border);
+    background: var(--card); color: var(--muted); font-size: 13px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .month-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .month-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+
+  /* ── FULL WIDTH CHART ── */
+  .chart-full { margin-bottom: 24px; }
+
+  /* ── COMPARISON TABLE ── */
+  .compare-table { width: 100%; border-collapse: collapse; }
+  .compare-table th {
+    background: var(--card2); color: var(--muted);
+    font-size: 12px; font-weight: 600; padding: 10px 14px;
+    text-align: center; border-bottom: 1px solid var(--border);
+  }
+  .compare-table th:first-child { text-align: left; }
+  .compare-table td {
+    padding: 10px 14px; font-size: 13px; text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .compare-table td:first-child { text-align: left; color: var(--muted); }
+  .compare-table .val-red { color: var(--red); font-weight: 700; }
+  .compare-table .val-green { color: var(--green); font-weight: 700; }
+  .compare-table .val-yellow { color: var(--yellow); font-weight: 700; }
+
+  /* ── FOOTER ── */
+  .footer { text-align: center; padding: 20px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--border); margin-top: 8px; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .charts-grid, .charts-grid.three { grid-template-columns: 1fr; }
+    .tab-content { padding: 20px 16px; }
+    .header { padding: 16px; }
+    .kpi-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo-circle">華</div>
+    <div>
+      <h1>華夏玻璃｜CEO 產銷儀表板</h1>
+      <div class="sub">涵蓋期間：114年3月 ～ 115年2月　｜　業務部・製造課・廠長室</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="date">產製日期：115年3月</div>
+    <div class="report-tag">機密文件</div>
+  </div>
+</div>
+
+<!-- TAB NAV -->
+<div class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('overview', this)">📊 總覽</button>
+  <button class="tab-btn" onclick="switchTab('production', this)">🏭 製造效率</button>
+  <button class="tab-btn" onclick="switchTab('sales', this)">📦 業務表現</button>
+  <button class="tab-btn" onclick="switchTab('energy', this)">⚡ 能源與人力</button>
+</div>
+
+<!-- ══════════════════════════════════
+     TAB 1: 總覽 (OVERVIEW)
+══════════════════════════════════ -->
+<div id="tab-overview" class="tab-content active">
+
+  <!-- 警示摘要 -->
+  <div class="alert-box red">
+    <span class="alert-icon">🚨</span>
+    <div>
+      <strong>高度警示：</strong>生產效率11個月全數低於基準86.5%（最高3月79.5%，最低10月69.3%），差距始終超過7個百分點；7月扣款471萬、12月445萬為全年兩個高峰；瓶圖開發率11個月中僅3月（73%）、6月（60%）、1月（80%）三個月達標，整體開發能力嚴重不穩定；工程股缺員率44.8%，持續影響生產品質。
+    </div>
+  </div>
+  <div class="alert-box yellow">
+    <span class="alert-icon">⚠️</span>
+    <div>
+      <strong>需關注：</strong>生產出貨達成率自8月起連三月低迷（57%/64%/64%），直至12月回升103%；3月406萬、7月471萬、12月445萬為扣款三大峰值，金門酒廠為主要來源；5月（63萬）、6月（37萬）、8月（24萬）為全年扣款相對佳月；棧板回收率波動明顯（3月86%、7月104%、10月113%、115年1月115%），整體不穩定。
+    </div>
+  </div>
+  <div class="alert-box green">
+    <span class="alert-icon">✅</span>
+    <div>
+      <strong>正向進展：</strong>扣款金額115年2月12萬，11個月最佳；全年廠內公傷極低（114年僅3月製造課1件、7月品管課1件，8月至2月連續零公傷）；客訴處理成功率全年100%；生產效率自10月低點69.3%起逐步回升至2月76.5%；5月扣款63萬首度接近基準、6月37萬達標，顯示品質管控有階段性成效。
+    </div>
+  </div>
+
+  <!-- KPI 燈號 -->
+  <div class="section-title"><span class="dot"></span>關鍵指標燈號（最新月份：115年2月）</div>
+  <div class="kpi-grid">
+
+    <div class="kpi-card red">
+      <div class="status-dot red"></div>
+      <div class="kpi-label">生產效率（全廠）</div>
+      <div class="kpi-value">76.5%</div>
+      <div class="kpi-baseline">基準 86.5%</div>
+      <div class="kpi-delta warn">▲ +3.2%（連續改善）</div>
+    </div>
+
+    <div class="kpi-card green">
+      <div class="status-dot green"></div>
+      <div class="kpi-label">扣款金額</div>
+      <div class="kpi-value">12萬</div>
+      <div class="kpi-baseline">基準 ≤65萬</div>
+      <div class="kpi-delta pos">▼ 首次達標！</div>
+    </div>
+
+    <div class="kpi-card red">
+      <div class="status-dot red"></div>
+      <div class="kpi-label">工程股缺員率</div>
+      <div class="kpi-value">44.8%</div>
+      <div class="kpi-baseline">編制29人，在職16人</div>
+      <div class="kpi-delta neg">缺13員，持續惡化</div>
+    </div>
+
+    <div class="kpi-card red">
+      <div class="status-dot red"></div>
+      <div class="kpi-label">換模時間</div>
+      <div class="kpi-value">132分</div>
+      <div class="kpi-baseline">目標 ≤120分</div>
+      <div class="kpi-delta warn">▲ 較1月改善13分</div>
+    </div>
+
+    <div class="kpi-card yellow">
+      <div class="status-dot yellow"></div>
+      <div class="kpi-label">生產出貨達成率</div>
+      <div class="kpi-value">90%</div>
+      <div class="kpi-baseline">基準 100%</div>
+      <div class="kpi-delta warn">▼ −10%</div>
+    </div>
+
+    <div class="kpi-card red">
+      <div class="status-dot red"></div>
+      <div class="kpi-label">瓶圖開發成功率</div>
+      <div class="kpi-value">14%</div>
+      <div class="kpi-baseline">基準 56%（1月曾達80%）</div>
+      <div class="kpi-delta neg">▼ −66%（急速下滑）</div>
+    </div>
+
+    <div class="kpi-card green">
+      <div class="status-dot green"></div>
+      <div class="kpi-label">廠內公傷件數</div>
+      <div class="kpi-value">0件</div>
+      <div class="kpi-baseline">目標 0件</div>
+      <div class="kpi-delta pos">✓ 連續三月達標</div>
+    </div>
+
+    <div class="kpi-card green">
+      <div class="status-dot green"></div>
+      <div class="kpi-label">客訴處理成功率</div>
+      <div class="kpi-value">100%</div>
+      <div class="kpi-baseline">基準 70%</div>
+      <div class="kpi-delta pos">▲ +30%</div>
+    </div>
+
+  </div>
+
+  <!-- 三月趨勢概覽 -->
+  <div class="section-title"><span class="dot"></span>11個月核心指標趨勢（114年3月 ～ 115年2月）</div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>生產效率趨勢（%）</h3>
+      <div class="chart-wrapper" style="height:200px">
+        <canvas id="overviewEffChart"></canvas>
+      </div>
+      <div class="annotation">
+        <span>11個月走勢：</span>3月79.5%（最高）→逐步下滑至10月69.3%（最低）→此後緩升至2月76.5%。全年始終低於基準86.5%，差距7-17個百分點，反映產能結構性問題。
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>扣款金額趨勢（萬元）</h3>
+      <div class="chart-wrapper" style="height:200px">
+        <canvas id="overviewDeductChart"></canvas>
+      </div>
+
+      <div class="annotation">
+        <span>11個月扣款：</span>3月406萬、7月471萬（最高）、12月445萬為三大峰值；5月63萬、6月37萬、8月24萬、2月12萬（最低）為相對佳月。峰值多與金門酒廠品質問題相關。
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════
+     TAB 2: 製造效率
+══════════════════════════════════ -->
+<div id="tab-production" class="tab-content">
+
+  <div class="section-title"><span class="dot"></span>全廠生產效率（月度）</div>
+  <div class="chart-full chart-card">
+    <h3>全廠 vs 各窯生產效率趨勢（基準線 86.5%）</h3>
+    <div class="chart-wrapper" style="height:260px">
+      <canvas id="effTrendChart"></canvas>
+    </div>
+    <div class="annotation">
+      <span>六月全廠效率：</span>8月75.2%→9月72.4%→10月69.3%（低谷）→12月71.6%→1月73.3%→2月76.5%，自10月低點後逐步回升。<span>H1/H3/H5各窯分月效率：</span>僅12月至2月有詳細爐台資料。<span>H5窯改善顯著：</span>12月61.7%→2月76.5%；<span>H3窯仍落後：</span>持續約65%。8-10月爐台個別數據待補充。
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>換模時間趨勢（分鐘，目標 ≤120）</h3>
+      <div class="chart-wrapper" style="height:220px">
+        <canvas id="moldChart"></canvas>
+      </div>
+      <div class="annotation">
+        <span>2月換模時間：</span>全廠132.0分（較1月145.1分改善13.1分）。H3窯127.6分最佳，H1窯150.6分最差（8次換模100%未達3小時標準）。工程股缺員13人（44.8%），仍是主要制約因素。
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>換模後3小時效率未達70%次數（目標 ≤20次/月）</h3>
+      <div class="chart-wrapper" style="height:220px">
+        <canvas id="moldFailChart"></canvas>
+      </div>
+      <div class="annotation">
+        <span>2月全廠67次（109次換模）：</span>H3窯37次（56次換模，66.1%未達標），H5窯22次（45次換模，48.9%），H1窯8次（8次換模，100%未達標）。H5繼續改善（25次→22次），H1異常惡化（3次→8次）。
+      </div>
+    </div>
+  </div>
+
+  <!-- 各窯詳表 -->
+  <div class="section-title"><span class="dot"></span>全廠效率明細（11個月對比）</div>
+  <div class="chart-card" style="margin-bottom:20px; overflow-x:auto">
+    <table class="furnace-table" style="min-width:900px; font-size:12px">
+      <thead>
+        <tr>
+          <th>窯別</th>
+          <th>3月</th><th>4月</th><th>5月</th><th>6月</th><th>7月</th>
+          <th>8月</th><th>9月</th><th>10月</th>
+          <th>12月</th><th>115/1月</th><th>115/2月</th>
+          <th>基準</th><th>狀態</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="font-weight:700">H1 窯</td>
+          <td class="val-muted">—</td><td class="val-muted">—</td><td class="val-muted">—</td><td class="val-muted">—</td><td class="val-muted">—</td>
+          <td class="val-muted">—</td><td class="val-muted">—</td><td class="val-muted">—</td>
+          <td>85.2%</td><td>85.0%</td><td class="val-yellow">~85.0%</td>
+          <td>86.5%</td><td><span class="badge yellow">輕微不足</span></td>
+        </tr>
+        <tr>
+          <td style="font-weight:700">H3 窯</td>
+          <td class="val-muted">—</td><td class="val-muted">—</td><td class="val-muted">—</td><td class="val-muted">—</td><td class="val-muted">—</td>
+          <td class="val-muted">—</td><td class="val-muted">—</td><td class="val-muted">—</td>
+          <td class="val-red">67.2%</td><td class="val-red">63.0%</td><td class="val-red">~65.0%</td>
+          <td>86.5%</td><td><span class="badge red">嚴重異常</span></td>
+        </tr>
+        <tr>
+          <td style="font-weight:700">H5 窯</td>
+          <td class="val-muted">—</td><td class="val-muted">—</td><td class="val-muted">—</td><td class="val-muted">—</td><td class="val-muted">—</td>
+          <td class="val-muted">—</td><td class="val-muted">—</td><td class="val-muted">—</td>
+          <td class="val-red">61.7%</td><td class="val-yellow">72.0%</td><td class="val-yellow">~76.5%</td>
+          <td>86.5%</td><td><span class="badge yellow">持續改善</span></td>
+        </tr>
+        <tr style="font-weight:700">
+          <td>全廠</td>
+          <td class="val-yellow">79.5%</td><td class="val-yellow">76.7%</td><td class="val-yellow">75.3%</td><td class="val-yellow">77.8%</td><td class="val-red">72.0%</td>
+          <td class="val-yellow">75.2%</td><td class="val-red">72.4%</td><td class="val-red">69.3%</td>
+          <td class="val-red">71.6%</td><td class="val-red">73.3%</td><td class="val-yellow">76.5%</td>
+          <td>86.5%</td><td><span class="badge yellow">改善中</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="annotation" style="margin-top:12px">
+      ※ 爐台個別效率（H1/H3/H5）僅114年12月至115年2月有詳細資料；全廠效率採入庫效率（入庫噸/引拉噸）。3月79.5%為11個月最高，10月69.3%為最低點。
+    </div>
+  </div>
+
+  <!-- 瓶屑添加率 -->
+  <div class="section-title"><span class="dot"></span>瓶屑添加率（回收玻璃使用率）</div>
+  <div class="chart-card">
+    <h3>各窯瓶屑添加率 vs 目標（三月趨勢）</h3>
+    <div class="chart-wrapper" style="height:220px">
+      <canvas id="culletChart"></canvas>
+    </div>
+    <div class="annotation">
+      <span>H3窯2月29.0%再度下滑（目標40%，負差異11%）：</span>H5-2生產公賣局酒瓶、控制色澤需降低瓶屑比例，廠外回收瓶品質問題仍存在。<br>
+      <span>H1瓶屑添加率81.2%（目標70%，正差異11.2%）：</span>廠外回收玻璃供應量充足，但需注意慶功砂鐵份不良率（水份超標5.13%）。
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════
+     TAB 3: 業務表現
+══════════════════════════════════ -->
+<div id="tab-sales" class="tab-content">
+
+  <div class="section-title"><span class="dot"></span>業務部關鍵績效月度對比</div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>生產出貨達成率（%，目標 100%）</h3>
+      <div class="chart-wrapper" style="height:200px">
+        <canvas id="shipChart"></canvas>
+      </div>
+      <div class="annotation">
+        <span>8-10月出貨嚴重低迷（57%/64%/64%）：</span>直至12月才回升至103%。1月92%、2月90%仍未達100%基準。A4056 600cc庫存問題持續影響達成率，建議追蹤去化進度。
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>扣款金額（萬元，基準 ≤65萬）</h3>
+      <div class="chart-wrapper" style="height:200px">
+        <canvas id="deductChart"></canvas>
+      </div>
+      <div class="annotation">
+        <span>扣款六月走勢：</span>8月24萬（達標）→9月198萬→10月178萬→12月445萬（峰值）→1月232萬→2月12萬（六月最佳）。品質問題9-12月嚴重，2月終獲突破性改善，但需持續監控。
+      </div>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>瓶圖開發成功率（%，基準 56%）</h3>
+      <div class="chart-wrapper" style="height:200px">
+        <canvas id="designChart"></canvas>
+      </div>
+      <div class="annotation">
+        <span>六月均低於基準56%（除1月外）：</span>8月21%→9月10%（最低）→10月18%→12月22%→1月80%（異常高峰）→2月14%。波動極大，開發能量嚴重不穩定，需確認設計資源配置問題。
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>棧板回收達成率（%，目標 95%）</h3>
+      <div class="chart-wrapper" style="height:200px">
+        <canvas id="palletChart"></canvas>
+      </div>
+      <div class="annotation">
+        <span>六月棧板回收趨勢：</span>8月77%→9月90%→10月113%→12月76%→1月115%→2月92%。波動幅度大，10月與1月超標可能為補回庫存棧板。整體仍未穩定達標，建議加強棧板管控。
+      </div>
+    </div>
+  </div>
+
+  <!-- 業務指標對照表 -->
+  <div class="section-title"><span class="dot"></span>業務績效11個月對照表（114年3月 ～ 115年2月）</div>
+  <div class="chart-card" style="overflow-x:auto">
+    <table class="compare-table" style="min-width:1000px; font-size:12px">
+      <thead>
+        <tr>
+          <th>指標</th><th>基準</th>
+          <th>3月</th><th>4月</th><th>5月</th><th>6月</th><th>7月</th>
+          <th>8月</th><th>9月</th><th>10月</th>
+          <th>12月</th><th>115/1</th><th>115/2</th>
+          <th>狀態</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>瓶圖開發成功率</td><td>56%</td>
+          <td class="val-green">73%</td><td class="val-red">29%</td><td class="val-red">36%</td><td class="val-green">60%</td><td class="val-red">30%</td>
+          <td class="val-red">21%</td><td class="val-red">10%</td><td class="val-red">18%</td>
+          <td class="val-red">22%</td><td class="val-green">80%</td><td class="val-red">14%</td>
+          <td><span class="badge red">不穩定</span></td>
+        </tr>
+        <tr>
+          <td>扣款金額</td><td>≤65萬</td>
+          <td class="val-red">406萬</td><td class="val-red">293萬</td><td class="val-green">63萬</td><td class="val-green">37萬</td><td class="val-red">471萬</td>
+          <td class="val-green">24萬</td><td class="val-red">198萬</td><td class="val-red">178萬</td>
+          <td class="val-red">445萬</td><td class="val-red">232萬</td><td class="val-green">12萬</td>
+          <td><span class="badge yellow">改善中</span></td>
+        </tr>
+        <tr>
+          <td>抱怨處理成功率</td><td>70%</td>
+          <td class="val-green">100%</td><td class="val-green">100%</td><td class="val-green">100%</td><td class="val-green">100%</td><td class="val-green">100%</td>
+          <td class="val-green">100%</td><td class="val-green">100%</td><td class="val-green">100%</td>
+          <td class="val-green">100%</td><td class="val-green">100%</td><td class="val-green">100%</td>
+          <td><span class="badge green">優秀</span></td>
+        </tr>
+        <tr>
+          <td>生產出貨達成率</td><td>100%</td>
+          <td class="val-green">106%</td><td class="val-green">101%</td><td class="val-yellow">97%</td><td class="val-yellow">99%</td><td class="val-green">107%</td>
+          <td class="val-red">57%</td><td class="val-red">64%</td><td class="val-red">64%</td>
+          <td class="val-green">103%</td><td class="val-yellow">92%</td><td class="val-yellow">90%</td>
+          <td><span class="badge yellow">注意</span></td>
+        </tr>
+        <tr>
+          <td>棧板回收達成率</td><td>95%</td>
+          <td class="val-red">86%</td><td class="val-yellow">89%</td><td class="val-green">100%</td><td class="val-yellow">94%</td><td class="val-green">104%</td>
+          <td class="val-red">77%</td><td class="val-yellow">90%</td><td class="val-green">113%</td>
+          <td class="val-red">76%</td><td class="val-green">115%</td><td class="val-yellow">92%</td>
+          <td><span class="badge yellow">波動大</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════
+     TAB 4: 能源與人力
+══════════════════════════════════ -->
+<div id="tab-energy" class="tab-content">
+
+  <div class="section-title"><span class="dot"></span>用電量趨勢（114年全年 + 115年1～2月）</div>
+  <div class="chart-full chart-card">
+    <h3>月總用電量（度）－114年各月（含8-10月資料）+ 115年1月、2月</h3>
+    <div class="chart-wrapper" style="height:240px">
+      <canvas id="powerChart"></canvas>
+    </div>
+    <div class="annotation">
+      <span>115年2月用電1,046,090度，</span>較115年1月（4,676,400度）大幅下降，但2月僅28天（年節假期影響），折算日均3.7萬度。114年全年用電52,306,260度，較113年59,084,400度下降11.5%，能源效率持續優化。
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>月瓦斯用量（m³）－115年 vs 114年同期比較</h3>
+      <div class="chart-wrapper" style="height:220px">
+        <canvas id="gasChart"></canvas>
+      </div>
+      <div class="annotation">
+        <span>115年1～2月瓦斯用量均低於114年同期：</span>1月1,686,123 m³（較去年−185,741，−9.9%）；2月1,384,993 m³（較去年−88,595，−6.0%）。再生油使用率100%，能源結構持續優化。
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>製造課人員動態（115年2月）</h3>
+      <div class="chart-wrapper" style="height:220px">
+        <canvas id="staffChart"></canvas>
+      </div>
+      <div class="annotation">
+        <span>2月在廠143人（較1月減少2人）：</span>本月新進1人（外勞），離職3人（外勞2、本地1）。外勞比例61.5%（77人），生產股外勞比例85.3%（58人），高度依賴外籍勞工。工程股編制29人，實際16人，缺員13人（44.8%），嚴重影響換模品質。
+      </div>
+    </div>
+  </div>
+
+  <!-- 人員數月度走勢 -->
+  <div class="section-title"><span class="dot"></span>製造課人員月度走勢（114年全年 + 115年前兩月）</div>
+  <div class="chart-full chart-card">
+    <h3>製造課現有人數月度變化（含外勞比例）</h3>
+    <div class="chart-wrapper" style="height:240px">
+      <canvas id="staffTrendChart"></canvas>
+    </div>
+    <div class="annotation">
+      <span>人員持續下滑：</span>114年初166人→年底149人→115年1月145人→115年2月143人，16個月共流失23人。<span>外勞比例攀升：</span>從58.8%（114年1月）升至61.5%（115年2月），本地員工流失速度較快。<br>
+      <span>115年累計人員異動：</span>新進4人（本地1、外勞3），離職10人（本地2、外勞8），淨流失6人，結構持續惡化。
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  華夏玻璃機密文件　｜　資料來源：114年3月～10月、12月、115年1月、2月產銷匯整　｜　更新日期：115年3月
+</div>
+
+<!-- ══════════════════════════════════
+     CHART.JS SCRIPTS
+══════════════════════════════════ -->
+<script>
+const months = ['114年3月', '114年4月', '114年5月', '114年6月', '114年7月', '114年8月', '114年9月', '114年10月', '114年12月', '115年1月', '115年2月'];
+const baseline = (val, len) => Array(len).fill(val);
+
+const defaultOpts = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { labels: { color: '#4b5563', font: { size: 11 } } } },
+  scales: {
+    x: { ticks: { color: '#6b7280', font: { size: 11 } }, grid: { color: 'rgba(0,0,0,0.06)' } },
+    y: { ticks: { color: '#6b7280', font: { size: 11 } }, grid: { color: 'rgba(0,0,0,0.06)' } }
+  }
+};
+
+function makeChart(id, cfg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  return new Chart(el, cfg);
+}
+
+// ── Overview: Efficiency ──
+makeChart('overviewEffChart', {
+  type: 'line',
+  data: {
+    labels: months,
+    datasets: [
+      { label: '全廠效率', data: [79.50, 76.66, 75.30, 77.80, 72.00, 75.21, 72.36, 69.27, 71.56, 73.28, 76.45], borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.15)', tension: 0.3, pointRadius: 4, pointBackgroundColor: '#6366f1' },
+      { label: '基準(86.5%)', data: [86.5,86.5,86.5,86.5,86.5,86.5,86.5,86.5,86.5,86.5,86.5], borderColor: '#52c41a', borderDash: [6,3], pointRadius: 0, borderWidth: 2 }
+    ]
+  },
+  options: { ...defaultOpts, scales: { ...defaultOpts.scales, y: { ...defaultOpts.scales.y, min: 60, max: 100, ticks: { color: '#6b7280', callback: v => v + '%' } } } }
+});
+
+// ── Overview: Deduct ──
+makeChart('overviewDeductChart', {
+  type: 'bar',
+  data: {
+    labels: months,
+    datasets: [
+      { label: '扣款金額(萬)', data: [406, 293, 63, 37, 471, 24, 198, 178, 445, 232, 12],
+        backgroundColor: ['rgba(255,77,79,0.9)','rgba(255,77,79,0.8)','rgba(82,196,26,0.7)','rgba(82,196,26,0.8)','rgba(255,77,79,0.9)','rgba(82,196,26,0.8)','rgba(255,77,79,0.8)','rgba(255,77,79,0.7)','rgba(255,77,79,0.9)','rgba(255,77,79,0.6)','rgba(82,196,26,0.8)'],
+        borderColor: ['#ff4d4f','#ff4d4f','#52c41a','#52c41a','#ff4d4f','#52c41a','#ff4d4f','#ff4d4f','#ff4d4f','#ff4d4f','#52c41a'], borderWidth: 1, borderRadius: 4 },
+      { label: '基準(65萬)', data: [65,65,65,65,65,65,65,65,65,65,65], type: 'line', borderColor: '#52c41a', borderDash: [6,3], pointRadius: 0, borderWidth: 2 }
+    ]
+  },
+  options: { ...defaultOpts }
+});
+
+// ── Production: Efficiency Trend ──
+makeChart('effTrendChart', {
+  type: 'line',
+  data: {
+    labels: months,
+    datasets: [
+      { label: '全廠', data: [79.50, 76.66, 75.30, 77.80, 72.00, 75.21, 72.36, 69.27, 71.56, 73.28, 76.45], borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.1)', tension: 0.3, pointRadius: 4, borderWidth: 3 },
+      { label: 'H1窯', data: [null,null,null,null,null,null,null,null, 85.20, 85.04, 85.0], borderColor: '#1890ff', backgroundColor: 'rgba(24,144,255,0.1)', tension: 0.3, pointRadius: 5 },
+      { label: 'H3窯', data: [null,null,null,null,null,null,null,null, 67.15, 63.01, 65.0], borderColor: '#ff4d4f', backgroundColor: 'rgba(255,77,79,0.1)', tension: 0.3, pointRadius: 5 },
+      { label: 'H5窯', data: [null,null,null,null,null,null,null,null, 61.69, 71.98, 76.5], borderColor: '#faad14', backgroundColor: 'rgba(250,173,20,0.1)', tension: 0.3, pointRadius: 5 },
+      { label: '基準(86.5%)', data: [86.5,86.5,86.5,86.5,86.5,86.5,86.5,86.5,86.5,86.5,86.5], borderColor: '#52c41a', borderDash: [6,3], pointRadius: 0, borderWidth: 2 }
+    ]
+  },
+  options: { ...defaultOpts, plugins: { ...defaultOpts.plugins, legend: { labels: { color: '#4b5563', font: { size: 11 } } } }, scales: { ...defaultOpts.scales, y: { ...defaultOpts.scales.y, min: 55, max: 95, ticks: { color: '#6b7280', callback: v => v + '%' } } } }
+});
+
+// ── Production: Mold Time ──
+makeChart('moldChart', {
+  type: 'bar',
+  data: {
+    labels: ['全廠\n12月', '全廠\n1月', '全廠\n2月', 'H1\n2月', 'H3\n2月', 'H5\n2月'],
+    datasets: [
+      {
+        label: '換模時間(分鐘)',
+        data: [125.8, 145.1, 132.0, 150.6, 127.6, 134.2],
+        backgroundColor: (ctx) => ctx.parsed.y > 120 ? 'rgba(255,77,79,0.7)' : 'rgba(82,196,26,0.7)',
+        borderRadius: 4
+      },
+      { label: '目標(120分)', data: Array(6).fill(120), type: 'line', borderColor: '#52c41a', borderDash: [6,3], pointRadius: 0, borderWidth: 2 }
+    ]
+  },
+  options: { ...defaultOpts }
+});
+
+// ── Production: Mold Fail ──
+makeChart('moldFailChart', {
+  type: 'bar',
+  data: {
+    labels: ['全廠\n12月', '全廠\n1月', '全廠\n2月', 'H1\n2月', 'H3\n2月', 'H5\n2月'],
+    datasets: [
+      {
+        label: '換模後3hr未達70%次數',
+        data: [78, 67, 67, 8, 37, 22],
+        backgroundColor: ['rgba(255,77,79,0.6)','rgba(255,77,79,0.6)','rgba(255,77,79,0.6)','rgba(250,173,20,0.7)','rgba(255,77,79,0.7)','rgba(250,173,20,0.7)'],
+        borderRadius: 4
+      },
+      { label: '目標(20次)', data: Array(6).fill(20), type: 'line', borderColor: '#52c41a', borderDash: [6,3], pointRadius: 0, borderWidth: 2 }
+    ]
+  },
+  options: { ...defaultOpts }
+});
+
+// ── Production: Cullet ──
+makeChart('culletChart', {
+  type: 'bar',
+  data: {
+    labels: ['H1\n12月', 'H1\n1月', 'H1\n2月', 'H3\n12月', 'H3\n1月', 'H3\n2月', 'H5\n12月', 'H5\n1月', 'H5\n2月'],
+    datasets: [
+      {
+        label: '瓶屑添加率',
+        data: [80.9, 82.9, 81.2, 35.8, 35.1, 29.0, 62.3, 69.0, 71.6],
+        backgroundColor: [
+          'rgba(24,144,255,0.6)','rgba(24,144,255,0.7)','rgba(24,144,255,0.8)',
+          'rgba(255,77,79,0.6)','rgba(255,77,79,0.7)','rgba(255,77,79,0.8)',
+          'rgba(250,173,20,0.6)','rgba(250,173,20,0.7)','rgba(250,173,20,0.8)'
+        ],
+        borderRadius: 4
+      },
+      { label: 'H1目標(70%)', data: [70,70,70,null,null,null,null,null,null], type: 'line', borderColor: '#1890ff', borderDash: [6,3], pointRadius: 0, borderWidth: 2 },
+      { label: 'H3目標(40%)', data: [null,null,null,40,40,40,null,null,null], type: 'line', borderColor: '#ff4d4f', borderDash: [6,3], pointRadius: 0, borderWidth: 2 },
+      { label: 'H5目標(70%)', data: [null,null,null,null,null,null,70,70,70], type: 'line', borderColor: '#faad14', borderDash: [6,3], pointRadius: 0, borderWidth: 2 }
+    ]
+  },
+  options: { ...defaultOpts, scales: { ...defaultOpts.scales, y: { ...defaultOpts.scales.y, min: 0, max: 110, ticks: { color: '#6b7280', callback: v => v + '%' } } } }
+});
+
+// ── Sales: Shipment ──
+makeChart('shipChart', {
+  type: 'bar',
+  data: {
+    labels: months,
+    datasets: [
+      { label: '出貨達成率', data: [106, 101, 97, 99, 107, 57, 64, 64, 103, 92, 90],
+        backgroundColor: ['rgba(82,196,26,0.7)','rgba(82,196,26,0.7)','rgba(250,173,20,0.7)','rgba(250,173,20,0.7)','rgba(82,196,26,0.7)','rgba(255,77,79,0.7)','rgba(255,77,79,0.7)','rgba(255,77,79,0.7)','rgba(82,196,26,0.7)','rgba(250,173,20,0.7)','rgba(250,173,20,0.7)'], borderRadius: 4 },
+      { label: '目標(100%)', data: [100,100,100,100,100,100,100,100,100,100,100], type: 'line', borderColor: '#52c41a', borderDash: [6,3], pointRadius: 0, borderWidth: 2 }
+    ]
+  },
+  options: { ...defaultOpts, scales: { ...defaultOpts.scales, y: { ...defaultOpts.scales.y, min: 40, max: 120, ticks: { color: '#6b7280', callback: v => v + '%' } } } }
+});
+
+// ── Sales: Deduct ──
+makeChart('deductChart', {
+  type: 'bar',
+  data: {
+    labels: months,
+    datasets: [
+      { label: '扣款金額(萬元)', data: [406, 293, 63, 37, 471, 24, 198, 178, 445, 232, 12],
+        backgroundColor: ['rgba(255,77,79,0.9)','rgba(255,77,79,0.8)','rgba(82,196,26,0.7)','rgba(82,196,26,0.8)','rgba(255,77,79,0.9)','rgba(82,196,26,0.8)','rgba(255,77,79,0.8)','rgba(255,77,79,0.7)','rgba(255,77,79,0.9)','rgba(255,77,79,0.6)','rgba(82,196,26,0.8)'], borderRadius: 4 },
+      { label: '基準(65萬)', data: [65,65,65,65,65,65,65,65,65,65,65], type: 'line', borderColor: '#52c41a', borderDash: [6,3], pointRadius: 0, borderWidth: 2 }
+    ]
+  },
+  options: { ...defaultOpts }
+});
+
+// ── Sales: Design ──
+makeChart('designChart', {
+  type: 'bar',
+  data: {
+    labels: months,
+    datasets: [
+      { label: '瓶圖開發成功率', data: [73, 29, 36, 60, 30, 21, 10, 18, 22, 80, 14],
+        backgroundColor: ['rgba(82,196,26,0.7)','rgba(255,77,79,0.8)','rgba(255,77,79,0.7)','rgba(82,196,26,0.7)','rgba(255,77,79,0.8)','rgba(255,77,79,0.7)','rgba(255,77,79,0.9)','rgba(255,77,79,0.7)','rgba(255,77,79,0.7)','rgba(82,196,26,0.7)','rgba(255,77,79,0.8)'], borderRadius: 4 },
+      { label: '基準(56%)', data: [56,56,56,56,56,56,56,56,56,56,56], type: 'line', borderColor: '#faad14', borderDash: [6,3], pointRadius: 0, borderWidth: 2 }
+    ]
+  },
+  options: { ...defaultOpts, scales: { ...defaultOpts.scales, y: { ...defaultOpts.scales.y, min: 0, max: 100, ticks: { color: '#6b7280', callback: v => v + '%' } } } }
+});
+
+// ── Sales: Pallet ──
+makeChart('palletChart', {
+  type: 'bar',
+  data: {
+    labels: months,
+    datasets: [
+      { label: '棧板回收率', data: [86, 89, 100, 94, 104, 77, 90, 113, 76, 115, 92],
+        backgroundColor: ['rgba(255,77,79,0.7)','rgba(250,173,20,0.7)','rgba(82,196,26,0.7)','rgba(250,173,20,0.7)','rgba(82,196,26,0.7)','rgba(255,77,79,0.7)','rgba(250,173,20,0.7)','rgba(82,196,26,0.7)','rgba(255,77,79,0.7)','rgba(82,196,26,0.7)','rgba(250,173,20,0.7)'], borderRadius: 4 },
+      { label: '目標(95%)', data: [95,95,95,95,95,95,95,95,95,95,95], type: 'line', borderColor: '#faad14', borderDash: [6,3], pointRadius: 0, borderWidth: 2 }
+    ]
+  },
+  options: { ...defaultOpts, scales: { ...defaultOpts.scales, y: { ...defaultOpts.scales.y, min: 60, max: 130, ticks: { color: '#6b7280', callback: v => v + '%' } } } }
+});
+
+// ── Energy: Power ──
+const powerLabels = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月','115/1月','115/2月'];
+const power114 = [4681200,4198800,4772400,4686000,4939200,4906800,4879200,4020000,3744000,3802800,3915600,4064400];
+makeChart('powerChart', {
+  type: 'bar',
+  data: {
+    labels: powerLabels,
+    datasets: [
+      { label: '114年月用電量', data: [...power114, null, null], backgroundColor: 'rgba(99,102,241,0.6)', borderRadius: 4 },
+      { label: '115年', data: [null,null,null,null,null,null,null,null,null,null,null,null,4676400,1046090], backgroundColor: 'rgba(24,144,255,0.9)', borderRadius: 4 }
+    ]
+  },
+  options: { ...defaultOpts, scales: { ...defaultOpts.scales, y: { ...defaultOpts.scales.y, ticks: { color: '#6b7280', callback: v => (v/10000).toFixed(0) + '萬度' } } } }
+});
+
+// ── Energy: Gas (115 vs 114) ──
+const gasLabels = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+const gas114 = [1871867,1473588,1363033,1302552,1421156,1404303,1382830,837719,863563,980672,1119745,1213998];
+const gas115 = [1686123,1384993,null,null,null,null,null,null,null,null,null,null];
+makeChart('gasChart', {
+  type: 'line',
+  data: {
+    labels: gasLabels,
+    datasets: [
+      { label: '114年', data: gas114, borderColor: '#8b90a7', backgroundColor: 'rgba(139,144,167,0.1)', tension: 0.3, pointRadius: 3 },
+      { label: '115年', data: gas115, borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.15)', tension: 0.3, pointRadius: 5, borderWidth: 3 }
+    ]
+  },
+  options: { ...defaultOpts, scales: { ...defaultOpts.scales, y: { ...defaultOpts.scales.y, ticks: { color: '#6b7280', callback: v => (v/10000).toFixed(0) + '萬m³' } } } }
+});
+
+// ── Energy: Staff Donut (Feb) ──
+makeChart('staffChart', {
+  type: 'doughnut',
+  data: {
+    labels: ['外勞(77人)', '本國幹部(27人)', '本國員工(26人)', '契約工(2人)', '缺員(估65人)'],
+    datasets: [{
+      data: [77, 27, 26, 2, 65],
+      backgroundColor: ['rgba(24,144,255,0.8)', 'rgba(82,196,26,0.8)', 'rgba(99,102,241,0.8)', 'rgba(250,173,20,0.8)', 'rgba(255,77,79,0.25)'],
+      borderColor: ['#1890ff', '#52c41a', '#6366f1', '#faad14', '#ff4d4f'],
+      borderWidth: 2
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'right', labels: { color: '#4b5563', font: { size: 10 } } } }
+  }
+});
+
+// ── Energy: Staff Trend (114全年 + 115年1-2月) ──
+const staffMonths = ['114/1','114/2','114/3','114/4','114/5','114/6','114/7','114/8','114/9','114/10','114/11','114/12','115/1','115/2'];
+const staffTotal = [170,174,170,166,156,145,139,140,145,148,156,149,145,143];
+const foreignRatio = [58.8,59.8,60.0,59.0,57.1,53.8,52.5,54.3,55.9,57.4,60.9,62.4,61.4,61.5];
+makeChart('staffTrendChart', {
+  type: 'bar',
+  data: {
+    labels: staffMonths,
+    datasets: [
+      { label: '製造課現有人數(左軸)', data: staffTotal, backgroundColor: staffMonths.map((m,i) => i >= 12 ? 'rgba(24,144,255,0.8)' : 'rgba(99,102,241,0.6)'), borderRadius: 4 },
+      { label: '外勞比例%(右軸)', data: foreignRatio, type: 'line', borderColor: '#faad14', backgroundColor: 'rgba(250,173,20,0.1)', tension: 0.3, pointRadius: 4, yAxisID: 'y2' }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#4b5563', font: { size: 11 } } } },
+    scales: {
+      x: { ticks: { color: '#6b7280', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+      y: { min: 120, ticks: { color: '#6b7280', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.05)' }, title: { display: true, text: '人數', color: '#8b90a7' } },
+      y2: { position: 'right', min: 45, max: 70, ticks: { color: '#b45309', font: { size: 11 }, callback: v => v + '%' }, grid: { display: false } }
+    }
+  }
+});
+
+// ── TAB SWITCHING ──
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>
